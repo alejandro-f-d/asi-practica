@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# módulo que crea (o elimina) sistemas de ficheros
+
+# argumentos:
+#    "disk": el dispositivo de bloques (obligatorio)
+#    "state": "present"|"absent" (por defecto, "present")
+#    "fs_type": tipo de sistema de ficheros (obligatorio si "present": debe corresponder a un tipo soportado en el equipo; ignorado si "absent")
+#    "force": crea el sistema de ficheros aunque ya exista uno de otro tipo; "true"|"false" (por defecto, "false"; solo consultado si "present")
+#    "opts": lista de opciones separadas por comas (optativo; solo consultado si "present")
+
+# valor devuelto:
+#       0 OK sin cambios
+#       128 OK con cambios
+#       1 ejecución sin ser superusuario
+#       2 error en argumentos
+#       3 no es un dispositivo de bloques
+#       4 no es un tipo de sistema de ficheros soportado en el equipo
+#       5 ya existía sistema de ficheros de otro tipo y "force" = "false"
+#       6 error en mkfs
+#       7 error al eliminar el sistema de ficheros
+
+test $(id -u) = 0 || exit 1 # debe ejecutarse como superusuario
+
+. $(dirname $0)/prologue # incluye el prólogo
+
+# comprueba argumentos
+test $disk || exit 2  # disk es obligatorio
+state=${state:-"present"} # valor por defecto si no se especifica
+test $state = "present" -o $state = "absent" || exit 2
+
+force=${force:-"false"} # valor por defecto si no se especifica
+test $force = "true" -o $force = "false" || exit 2
+test $state = "present" && test ! "$fs_type" && exit 2 
+
+# .............

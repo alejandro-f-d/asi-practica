@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# módulo que crea (o elimina) un montaje pudiendo afectar también al fichero "/etc/fstab";
+
+# argumentos:
+#    "present"|"absent" (por defecto, "present")
+#    "mount_point": directorio donde se monta o desmonta (obligatorio)
+#    "source": dispositivo que se monta (obligatorio si "present")
+#    "fs_type": tipo de sistema de ficheros (obligatorio si "present")
+#    "opts": opciones de montaje; lista separada por comas (obligatorio si "present")
+#    "fstab": añade, si "present", o elimina, si "absent", el montaje del fichero en "/etc/fstab"; "true"|"false" (por defecto, "false")
+#    "dir_handling": al montar, crea el directorio correspondiente al punto de montaje si no existe y, al desmontar, elimina dicho directorio si existe; "true"|"false" (por defecto, "false")
+
+# valor devuelto
+#       0 OK sin cambios
+#       128 OK con cambios
+#       1 ejecución sin ser superusuario
+#       2 error en argumentos
+#       3 error ya existía un montaje previo incompatible
+#       4 error ya existía una entrada en /etc/fstab incompatible
+#       5 error al no existir el directorio
+#       6 error al crear el directorio
+#       7 error en mandato de montaje
+#       8 error en mandato de desmontaje
+
+# comprueba si en alguna línea del fichero recibido como primer argumento, cuyos campos están separados por espacios y/o tabuladores ignorando las líneas que empiezan por #, aparece como segundo campo el valor recibido como segundo argumento, imprimiendo, además, en qué número de línea del fichero aparece (no imprime nada si no aparece)
+match_second_field() {
+    test $# -eq 2 || return 2
+    line=$(grep -nm1 "^[^#][[:graph:]][[:graph:]]*[[:blank:]][[:blank:]]*$2" $1 | cut -d: -f1)
+    test $line && { echo $line; return 0; } || return 1
+}
+
+# comprueba si en alguna línea del fichero recibido como primer argumento, cuyos campos están separados por espacios y/o tabuladores, aparecen como primeros campos los cuatro argumentos restantes, imprimiendo, además, en qué número de línea del fichero aparecen (no imprime nada si no aparecen)
+match_first_four_fields() {
+    test $# -eq 5 || return 2
+    line=$(grep -nm1 "^$2[[:blank:]][[:blank:]]*$3[[:blank:]][[:blank:]]*$4[[:blank:]][[:blank:]]*$5" $1 | cut -d: -f1)
+    test $line && { echo $line; return 0; } || return 1
+}
+
+test $(id -u) = 0 || exit 1 # debe ejecutarse como superusuario
+
+. $(dirname $0)/prologue # incluye el prólogo
+
+# comprueba argumentos
+state=${state:-"present"} # valor por defecto si no se especifica
+dir_handling=${dir_handling:-"false"} # valor por defecto si no se especifica
+fstab=${fstab:-"false"} # valor por defecto si no se especifica
+
+test $state = "present" -o $state = "absent" || exit 2
+test $dir_handling = "true" -o $dir_handling = "false" || exit 2
+test $fstab = "true" -o $fstab = "false" || exit 2
+test $mount_point || exit 2
+test $state = "present" && { test $source || exit 2; }
+test $state = "present" && { test $fs_type || exit 2; }
+test $state = "present" && { test $opts || exit 2; }
+
+# ......

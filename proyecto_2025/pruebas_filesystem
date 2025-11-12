@@ -1,0 +1,23 @@
+
+# No es un script: está ideado para copiar y pegar cada mandato en una consola
+
+# Se crea un disco virtual para evitar borrar un disco real por error.
+# variable de entorno DISCO: nombre del dispositivo que se usará para pruebas.
+truncate -s 1G miDisco # fichero que soporta el disco virtual
+DISCO=$(sudo losetup -f --show miDisco)
+echo $DISCO # veamos cómo se llama: puede salir cualquier valor
+
+sudo ./filesystem disk=/dev/NO fs_type=ext4 # dispo. no existe; error 3
+sudo ./filesystem disk=/etc/passwd fs_type=ext4 # no dispo. bloques; error 3
+sudo ./filesystem disk=$DISCO fs_type=ext # mal fs_type; error 4
+sudo ./filesystem disk=$DISCO fs_type=ext4 # OK retorna 0
+sudo blkid $DISCO # para comprobar que lo ha creado
+sudo ./filesystem disk=$DISCO fs_type=ext4 state=present # OK retorna 128
+sudo ./filesystem disk=$DISCO fs_type=ext2 # error 5: ya existe SF y diferente
+sudo ./filesystem disk=$DISCO fs_type=ext2 force=true # OK 0
+sudo blkid $DISCO # para comprobar que lo ha creado
+sudo ./filesystem disk=$DISCO opts=-c,-D fs_type=ext4 force=true # prueba opciones; debe ejecutar lento por las opciones especificadas; OK 0
+sudo blkid $DISCO # para comprobar mandato previo
+sudo ./filesystem disk=$DISCO opts=-XXXX fs_type=ext2 force=true # fuerza error 6: mkfs con opción errónea
+sudo ./filesystem disk=$DISCO state=absent # OK 0
+sudo ./filesystem disk=$DISCO state=absent # OK 128

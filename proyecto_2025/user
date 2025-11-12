@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# módulo que gestiona cuentas de usuarios
+
+# argumentos:
+#    "state": "present"|"absent" (por defecto, "present")
+#    "name": el nombre del usuario (obligatorio)
+#    "uid": UID asociado a la cuenta (opcional; si no especificado, lo elige el sistema)
+#    "group": nombre del grupo asociado a la cuenta (opcional; si no especificado, lo elige el sistema)
+#    "groups": grupos suplementarios asociados a la cuenta (opcional; si no especificado, ninguno)
+#    "comment": campo GECOS (opcional; si no especificado, vacío)
+#    "shell": shell asociado a la cuenta; (opcional; si no especificado, lo elige el sistema)
+#    NOTAS: la contraseña se crea vacía para facilitar la depuración del módulo; al crear una cuenta, siempre se crea su directorio "home"; al eliminar una cuenta, siempre se borra su directorio "home";
+
+# valor devuelto:
+#    0 OK sin cambios
+#    128 OK con cambios
+#    1 ejecución sin ser superusuario
+#    2 error en argumentos
+#    3 grupo especificado en "group" no existe
+#    4 al menos uno de los grupos especificados en "groups" no existe
+#    5 error en mandato que crea el usuario
+#    6 error en mandato que modifica el usuario
+#    7 error en mandato que elimina el usuario
+
+test $(id -u) = 0 || exit 1 # debe ejecutarse como superusuario
+
+. $(dirname $0)/prologue # incluye el prólogo
+
+# comprueba argumentos
+test $name || exit 2  # name es obligatorio
+state=${state:-"present"} # valor por defecto si no se especifica
+# comprueba que son correctos los valores de "state"
+test $state = "present" -o $state = "absent" || exit 2
+
+# ........................................

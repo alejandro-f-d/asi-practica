@@ -1,0 +1,38 @@
+# No es un script: está ideado para copiar y pegar cada mandato en una consola
+
+# variable de entorno DISCO: nombre del dispositivo que se usará para pruebas
+# que contiene un sistema de ficheros de tipo ext4
+
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=rw,relatime # OK 0
+findmnt -M /mnt # para comprobar que se ha montado
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=rw,relatime # OK 128
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=ro # error 3: existe un montaje previo incompatible 
+sudo ./mount state=absent mount_point=/mnt # OK 0
+sudo ./mount state=absent mount_point=/mnt # OK 128
+sudo ./mount source=$DISCO mount_point=/mnt2 fs_type=ext4 opts=rw,relatime # error 5 directorio no existe
+sudo ./mount source=$DISCO mount_point=/mnt2 fs_type=ext4 opts=rw,relatime dir_handling=true # OK 0: fuerza crear directorio
+sudo ./mount state=absent mount_point=/mnt2 dir_handling=true # OK 0: borra dir.
+findmnt -M /mnt2
+ls /mnt2
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=xxx # error 7: f
+allo en mount
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=rw,relatime fstab=true # OK 0: con fstab
+findmnt -M /mnt
+grep mnt /etc/fstab
+sudo ./mount source=$DISCO state=absent mount_point=/mnt fstab=true # OK 0: elimina con fstab
+findmnt -M /mnt
+grep mnt /etc/fstab
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=rw,relatime fstab=true # OK 0: con fstab de nuevo
+sudo ./mount source=$DISCO state=absent mount_point=/mnt # OK 0: pero elimina sin fstab
+findmnt -M /mnt
+grep mnt /etc/fstab
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=rw,relatime fstab=true # OK 0: con fstab de nuevo
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=ro,relatime fstab=true # error 4: no está montado pero en fstab hay una entrada incompatible
+sudo ./mount source=$DISCO state=absent mount_point=/mnt fstab=true # OK 0: solo elimina la entrada de fstab
+grep mnt /etc/fstab
+sudo ./mount source=$DISCO mount_point=/mnt fs_type=ext4 opts=ro,relatime fstab=true # OK 0: puede montarse de nuevo
+findmnt -M /mnt
+grep mnt /etc/fstab
+sudo ./mount source=$DISCO state=absent mount_point=/mnt fstab=true # OK 0
+findmnt -M /mnt
+grep mnt /etc/fstab

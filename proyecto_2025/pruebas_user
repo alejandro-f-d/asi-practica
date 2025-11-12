@@ -1,0 +1,33 @@
+# No es un script: está ideado para copiar y pegar cada mandato en una consola
+
+sudo ./user name=test group=noexiste # error 3: grupo no existente
+sudo ./user name=test groups=adm,noexiste,root # error 4: un grupo secundario no existe
+sudo ./user name=12345 # error 5: nombre de cuenta errónea 
+sudo ./user name=test # OK 0: con valores por defecto
+getent passwd test # comprobar que se ha creado correctamente
+sudo ./user name=test # OK 128: ya existe
+sudo ./user name=test shell=/bin/sh # OK 128: usermod no cambia nada
+sudo ./user name=test shell=/bin/bash # OK 0: usermod cambia shell
+getent passwd test # comprobar que nada ha cambiado
+sudo ./user name=test state=absent # OK 0
+getent passwd test # comprobar que se ha eliminado correctamente
+sudo ./user name=test state=absent # OK 128
+sudo ./user name=test shell=/bin/bash comment=TEST # OK 0: con algunas opciones
+getent passwd test # comprobar que se ha creado correctamente
+sudo ./user name=test shell=/bin/sh comment=Test # OK 0: usermod cambia
+getent passwd test # comprobar que ha cambiado
+sudo ./user name=test state=absent # OK 0
+sudo ./user name=test uid=2000 group=adm # OK 0: probando uid y group; elija uid que no exista previamente y un grupo que sí
+getent passwd test # comprobar que se ha creado correctamente
+sudo ./user name=test state=absent # OK 0
+sudo ./user name=test groups=adm,root # OK 0: probando grupos secundarios
+getent passwd test # comprobar que se ha creado correctamente
+groups test # comprobar que se ha creado correctamente
+sudo ./user name=test groups=root,adm # OK 128: nada ha cambiado
+getent passwd test # comprobar que nada ha cambiado
+groups test # comprobar que nada ha cambiado
+sudo ./user name=test groups=root,adm,bin # OK 0
+getent passwd test # comprobar que nada ha cambiado
+groups test # comprobar que ha cambiado
+sudo ./user name=test state=absent # OK 0
+getent passwd test # comprobar que se ha eliminado correctamente
