@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# 0: se ha completado correctamente realizando cambios: se ha creado o eliminado un sistema de ficheros.
+# 128: se ha completado correctamente pero sin realizar cambios.
+# 1: error por la ejecución sin ser superusuario.
+# 2: error en los argumentos.
+# 3: disk no es un dispositivo de bloques.
+# 4: fs_type no es un tipo de sistema de ficheros soportado en el equipo
+# 5: ya existía un sistema de ficheros de otro tipo y force es igual a false.
+# 6: error en mandato que crea el sistema de ficheros.
+# 7: error en mandato que elimina el sistema de ficheros.
+
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() {
+	echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+warn() {
+	echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+	echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+EXIT_CORR=0
+EXIT_SINCAMB=128
+ERR_SUPERUSR=1
+ERR_ARGS=2
+ERR_DISP_BLOQ=3
+ERR_FILESYS_NOSP=4
+ERR_EXISTENCIA_NO_FORCE=5
+ERR_CREARSYS=6
+ERR_BORRAR_ANT=7
+
+main() {
+	# Comprobación de usuario efectivo es el root. (sudo...)
+	if [ $(id -u) -ne 0 ]; then
+		error "Usuario real no es administrador."
+		exit "${ERR_SUPERUSR}"
+	fi
+
+	# Creación de arrays dinámicos en bash.
+	declare -A claves
+	declare -A valores
+
+	contador=0
+	for par in "$@"; do
+		claves[$contador]="${par%%=*}"
+		valores[$contador]="${par#*=}"
+
+		info "Clave: ${claves[$contador]} | Valor: ${valores[$contador]}"
+
+		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
+	done
+
+	# Verificación del parámetro obligatoria:
+	# Contador contiene el tamaño del array que contiene los conjuntos clave valor.
+	contador_2=0
+	encontrado=0
+	tiene_fs=0
+	info "Lista de los índices ${!claves[@]}" # Empieza en cero como en otros lenguajes.
+
+	for busq in "${!claves[@]}"; do
+		if [ "${claves[$busq]}" = "disk" ]; then
+			info "Disco encontrado"
+			encontrado=1
+			# Ahora hacemos la comprobación de que se trata de un dispositivo de bloques.
+			# Con stat si le pones en modo formato con -c y %F     file type te da el tipo de dispositivo.
+			tipo=$(stat -c %F "${valores[$busq]}")
+			if [ "${tipo}" != "block special file" ]; then
+				error "El disco introducido no es en formato de bloques"
+				exit "${ERR_DISP_BLOQ}"
+			fi
+			# Ver si tiene sistema de ficheros en caso de tenerlo se debe especificar el force.
+
+			if [ $(lsblk -f /dev/loop26 | awk 'NR==2 {print $2}' | wc -c) -ne 1 ]; then
+				info "El dispositivo de bloques tiene instalado un formato"
+				tiene_fs=1
+			else
+				info "El dispositivo de bloques no tiene instalado un formato."
+			fi
+
+		fi
+	done
+
+	if [ "$encontrado" -ne 1 ]; then
+		error "Parámetro del disco no encontrado."
+		exit "${ERR_ARGS}"
+	fi
+
+}
+
+main $@
