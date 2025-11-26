@@ -10,6 +10,8 @@
 # 6: error en mandato que crea el sistema de ficheros.
 # 7: error en mandato que elimina el sistema de ficheros.
 
+# TODO: Queda por hacer lo del state.
+
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 GREEN='\033[0;32m'
@@ -38,6 +40,22 @@ ERR_EXISTENCIA_NO_FORCE=5
 ERR_CREARSYS=6
 ERR_BORRAR_ANT=7
 
+getparam() {
+	# El -n es para hacer referencia a los parametros que se reciben son un array.
+	declare -n claves_array="$1"
+	declare -n valores_array="$2"
+	local clave_buscada="$3"
+
+	for idx in "${!claves_array[@]}"; do
+		if [[ "${claves_array[$idx]}" == "$clave_buscada" ]]; then
+			echo "${valores_array[$idx]}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
 main() {
 	# Comprobación de usuario efectivo es el root. (sudo...)
 	if [ $(id -u) -ne 0 ]; then
@@ -59,6 +77,15 @@ main() {
 		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
 	done
 
+	# Verificación de que exista el fs que se quiere instalar:
+	#
+	fsDeseado=$(getparam claves valores "fs_type")
+	verificadorExistenciaFS=$(cat /proc/filesystems | grep -w "$fsDeseado")
+	if [ $? -ne 0 ]; then
+		error "No existe el sistema de ficheros."
+		exit "$ERR_FILESYS_NOSP"
+	fi
+
 	# Verificación del parámetro obligatoria:
 	# Contador contiene el tamaño del array que contiene los conjuntos clave valor.
 	contador_2=0
@@ -79,19 +106,49 @@ main() {
 			fi
 			# Ver si tiene sistema de ficheros en caso de tenerlo se debe especificar el force.
 
-			if [ $(lsblk -f /dev/loop26 | awk 'NR==2 {print $2}' | wc -c) -ne 1 ]; then
-				info "El dispositivo de bloques tiene instalado un formato"
-				tiene_fs=1
-			else
-				info "El dispositivo de bloques no tiene instalado un formato."
-			fi
-
 		fi
 	done
 
 	if [ "$encontrado" -ne 1 ]; then
 		error "Parámetro del disco no encontrado."
 		exit "${ERR_ARGS}"
+	fi
+
+	directorioDisco=$(getparam claves valores "disk")
+
+	info "El disco es: $directorioDisco"
+	fs_actual=$(blkid -o value -s TYPE "$directorioDisco" 2>/dev/null)
+	if [ -n "$fs_actual" ]; then
+		info "El dispositivo tiene un sistema instalado, verificamos cual y dependiendo de si hay force se realizará el cambio."
+		info "El sistema instalado es: $fs_actual "
+
+		info "El sistema deseado es: $fsDeseado"
+		if [ "$fsDeseado" = "$fs_actual" ]; then
+			info "El disco ya tiene el filesystem deseado."
+			exit "$EXIT_SINCAMB"
+		else
+			info "El sistema no coincide, por lo que se requiere el force."
+			valorForce=$(getparam claves valores "force")
+
+			if [ "$valorForce" = "true" ]; then
+
+				info "Forzando el cambio..."
+				# TODO: Pendiente queda el establecer la sintaxis para establecer el sistema de ficheros. Merece la pena hacer una funcion para esto?
+			else
+				error "Force no establecido a true."
+				exit "$ERR_EXISTENCIA_NO_FORCE"
+			fi
+
+		fi
+
+	else
+		info "El sistema no tiene un sistema de ficheros."
+		# TODO: Pendiente queda el hacer la función para establecer el sistema de ficheros.
+
+		mkfs_cmd="mkfs.${fsDeseado}"
+		$mkfs_cmd "$directorioDisco"
+		info "Sistema creado con éxito."
+		exit "$EXIT_CORR"
 	fi
 
 }
