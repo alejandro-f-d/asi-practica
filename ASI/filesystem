@@ -77,6 +77,32 @@ main() {
 		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
 	done
 
+	# Verificacion de lo que se quiere hacer es si es absent para eliminar el sistema de ficheros.
+
+	accion=$(getparam claves valores "state")
+	info "State: $accion"
+	if [ "$accion" = "absent" ]; then
+
+		# Según el ejemplo para el absent no hace falta el force luego sería ejecutar unicamente
+		#  - Wipe all available signature types for a specific device with no recursion into partitions:
+		#sudo wipefs [-a|--all] /dev/sdX
+		discoOperar=$(getparam claves valores "disk")
+
+		fs_actual=$(blkid -o value -s TYPE "$discoOperar" 2>/dev/null)
+
+		if [ "${fs_actual}" = "" ]; then
+			info "El disco ya está sin formato."
+			exit "${EXIT_SINCAMB}"
+		fi
+
+		# sudo wipefs -a discoOperar
+		wipefs -a "$discoOperar"
+
+		info "Disco wipeado con exito"
+		exit "${EXIT_CORR}"
+
+	fi
+
 	# Verificación de que exista el fs que se quiere instalar:
 	#
 	fsDeseado=$(getparam claves valores "fs_type")
@@ -134,6 +160,9 @@ main() {
 
 				info "Forzando el cambio..."
 				# TODO: Pendiente queda el establecer la sintaxis para establecer el sistema de ficheros. Merece la pena hacer una funcion para esto?
+
+				mkfs_cmd="mkfs.${fsDeseado}"
+				$mkfs_cmd -f "$directorioDisco"
 			else
 				error "Force no establecido a true."
 				exit "$ERR_EXISTENCIA_NO_FORCE"
