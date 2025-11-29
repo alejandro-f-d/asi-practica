@@ -161,8 +161,18 @@ main() {
 				info "Forzando el cambio..."
 				# TODO: Pendiente queda el establecer la sintaxis para establecer el sistema de ficheros. Merece la pena hacer una funcion para esto?
 
-				mkfs_cmd="mkfs.${fsDeseado}"
-				$mkfs_cmd -f "$directorioDisco"
+				opciones=$(getparam claves valores "opts")
+				opciones=$(echo "${opciones}" | awk '{gsub(/,/, " "); print}')
+				mkfs_cmd="mkfs.${fsDeseado} -F ${opciones}"
+				info "El mkfs que se ejecuto: ${mkfs_cmd} ${directorioDisco}"
+
+				# $mkfs_cmd "$directorioDisco" || error "Error al crear el sistema de ficheros" && exit "${ERR_CREARSYS}"
+				$mkfs_cmd "$directorioDisco" ||
+					{
+						error "Error al crear el sistema de ficheros"
+						exit "${ERR_CREARSYS}"
+					}
+				info "FS del disco forzado con éxito."
 			else
 				error "Force no establecido a true."
 				exit "$ERR_EXISTENCIA_NO_FORCE"
@@ -174,8 +184,17 @@ main() {
 		info "El sistema no tiene un sistema de ficheros."
 		# TODO: Pendiente queda el hacer la función para establecer el sistema de ficheros.
 
-		mkfs_cmd="mkfs.${fsDeseado}"
-		$mkfs_cmd "$directorioDisco"
+		opciones=$(getparam claves valores "opts")
+		info "Las opciones seleccionados son: ${opciones}"
+		opciones=$(echo "${opciones}" | awk '{gsub(/,/, " "); print}')
+		info "Las opciones post-tratamiento son: ${opciones}"
+		mkfs_cmd="mkfs.${fsDeseado} ${opciones}"
+		info "El mkfs que se ejecuto: ${mkfs_cmd} ${directorioDisco}"
+		$mkfs_cmd "$directorioDisco" ||
+			{
+				error "Error al crear el sistema de ficheros"
+				exit "${ERR_CREARSYS}"
+			}
 		info "Sistema creado con éxito."
 		exit "$EXIT_CORR"
 	fi
