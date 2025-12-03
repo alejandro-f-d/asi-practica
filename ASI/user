@@ -24,6 +24,7 @@ ERR_ARGS=2
 ERR_GR_PPAL=3
 ERR_GR=4
 ERR_CREAR_USR=5
+ERR_BORRAR_USR=7
 getparam() {
 	# El -n es para hacer referencia a los parametros que se reciben son un array.
 	declare -n claves_array="$1"
@@ -58,7 +59,26 @@ main() {
 
 		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
 	done
+
+	opcionRealizar=$(getparam claves valores "state")
+
 	usuario=$(getparam claves valores "name")
+
+	if [ "${opcionRealizar}" = "absent" ]; then
+
+		# Aquí se hace el borrado del usuario.
+		#
+		getent passwd "${usuario}" &>/dev/null
+		if [ "$?" -ne 0 ]; then
+			info "El usuario no existe."
+			exit "${EXIT_SINCAMB}"
+		fi
+		sudo userdel -f -r "${usuario}" || {
+			error "Error al borrar el usuario"
+			exit "${ERR_BORRAR_USR}"
+		}
+		exit "${EXIT_CORR}"
+	fi
 
 	# Verificamos si el usuario existe para devolver el código 128.
 	cat /etc/passwd | grep "${usuario}" &>/dev/null
@@ -77,21 +97,42 @@ main() {
 
 		if [ "${comentario}" != "${comment}" ]; then
 			# Aquí se hace el cambio del comentario.
+			info "usermod comment."
 			sudo usermod -c "${comentario}" "${usuario}" || {
-				error "Error al crear el usuario."
+				error "Error al modificar el usuario."
 				exit "${ERR_CREAR_USR}"
 			}
 			exit "${EXIT_CORR}"
 		fi
-		if [ "${shell}" != "${terminal}" ]; then
+		if [ "$terminal" != "" ] && [ "$shell" != "$terminal" ]; then
 			# Aqui lo que se hace es verificar si hay que hacer un cambio de terminal.
+			info "usermod shell"
 			sudo usermod -s "${terminal}" "${usuario}" || {
-				error "Error al crear el usuario."
+				error "Error al modificar el usuario."
 				exit "${ERR_CREAR_USR}"
 			}
 			exit "${EXIT_CORR}"
 
 		fi
+
+		# usermod para los grupos
+
+		gruposPertenece=$(groups "${usuario}" | awk -F':' '{print $2}')
+		info "${gruposPertenece}"
+		gruposPertenece=$(echo "${gruposPertenece}" | awk '{$1=$1; gsub(/ /, ","); print $1}') # El $1=$1 quita espacios iniciales y finales.
+		groups=$(getparam claves valores "groups")
+		info "Grupos son: ${groups}"
+		info "Grupos donde esta registrado ya: ${gruposPertenece}"
+		if [ "${groups}" != "" ] && [ "${groups}" != "${gruposPertenece}" ]; then
+			info "Usermod groups"
+			usermod -G "${groups}" "${usuario}" || {
+				error "Error al modificar el usuario."
+				exit "${ERR_CREAR_USR}"
+			}
+
+			exit "${EXIT_CORR}"
+		fi
+
 		info "No se ha realizado ningún cambio."
 		exit "${EXIT_SINCAMB}"
 	fi
@@ -126,6 +167,8 @@ main() {
 				exit "${ERR_GR}"
 			fi
 		done
+		# Escribimos el mandato de tal manera que funcione, con awk
+		groups=$(echo "${groups}" | awk '{gsub(/ /, ","); print $1}')
 		cmd+=(-G "${groups}")
 	fi
 
