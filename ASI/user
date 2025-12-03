@@ -1,0 +1,149 @@
+#!/bin/bash
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() {
+	echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+warn() {
+	echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+	echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+EXIT_CORR=0
+EXIT_SINCAMB=128
+ERR_SUPERUSR=1
+ERR_ARGS=2
+ERR_GR_PPAL=3
+ERR_GR=4
+ERR_CREAR_USR=5
+getparam() {
+	# El -n es para hacer referencia a los parametros que se reciben son un array.
+	declare -n claves_array="$1"
+	declare -n valores_array="$2"
+	local clave_buscada="$3"
+
+	for idx in "${!claves_array[@]}"; do
+		if [[ "${claves_array[$idx]}" == "$clave_buscada" ]]; then
+			echo "${valores_array[$idx]}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+main() {
+	# Comprobación de usuario efectivo es el root. (sudo...)
+	if [ $(id -u) -ne 0 ]; then
+		error "Usuario real no es administrador."
+		exit "${ERR_SUPERUSR}"
+	fi
+	declare -A claves
+	declare -A valores
+
+	contador=0
+	for par in "$@"; do
+		claves[$contador]="${par%%=*}"
+		valores[$contador]="${par#*=}"
+
+		info "Clave: ${claves[$contador]} | Valor: ${valores[$contador]}"
+
+		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
+	done
+	usuario=$(getparam claves valores "name")
+
+	# Verificamos si el usuario existe para devolver el código 128.
+	cat /etc/passwd | grep "${usuario}" &>/dev/null
+	if [ "$?" -eq 0 ]; then
+		info "El usuario ya existia."
+		# TODO: Tenemos que comprobar los valores que tiene y en base a eso si es necesario modificar parámetros.
+		# groups, comment, shell
+
+		comment=$(getent passwd "${usuario}" | awk -F: '{print $5}')
+		info "Comment es: ${comment}"
+		shell=$(getent passwd "${usuario}" | awk -F: '{print $7}')
+		info "Shell es: ${shell}"
+		info "Print de los valores de entrada ${comment}, ${shell}"
+		comentario=$(getparam claves valores "comment")
+		terminal=$(getparam claves valores "shell")
+
+		if [ "${comentario}" != "${comment}" ]; then
+			# Aquí se hace el cambio del comentario.
+			sudo usermod -c "${comentario}" "${usuario}" || {
+				error "Error al crear el usuario."
+				exit "${ERR_CREAR_USR}"
+			}
+			exit "${EXIT_CORR}"
+		fi
+		if [ "${shell}" != "${terminal}" ]; then
+			# Aqui lo que se hace es verificar si hay que hacer un cambio de terminal.
+			sudo usermod -s "${terminal}" "${usuario}" || {
+				error "Error al crear el usuario."
+				exit "${ERR_CREAR_USR}"
+			}
+			exit "${EXIT_CORR}"
+
+		fi
+		info "No se ha realizado ningún cambio."
+		exit "${EXIT_SINCAMB}"
+	fi
+
+	cmd=(useradd "${usuario}")
+	# info "Status de terminación: $?"
+	if [ "$?" -ne 0 ]; then
+		error "Los campos obligatorios no se han especificado."
+		exit "${ERR_ARGS}"
+	fi
+	group=$(getparam claves valores "group")
+	if [ "$?" -eq 0 ]; then
+		cat /etc/group | awk '{gsub(/:/, " "); print $1}' | grep "${group}" &>/dev/null
+		if [ "$?" -ne 0 ]; then
+			error "El group espeficicado no existe."
+			exit "${ERR_GR_PPAL}"
+		fi
+		cmd+=(-g "${group}")
+	fi
+	# info "Contenido de grupo ${group}"
+
+	# Verificación de cada uno de los groups:
+
+	groups=$(getparam claves valores "groups")
+	if [ "$?" -eq 0 ]; then
+		groups=$(echo "${groups}" | awk '{gsub(/,/, " "); print}')
+		for grupo in $groups; do
+			info " Estudiando el grupo: ${grupo}"
+			cat /etc/group | awk '{gsub(/:/, " "); print $1}' | grep "${grupo}" &>/dev/null
+			if [ "$?" -ne 0 ]; then
+				error "El group ${grupo} no existe"
+				exit "${ERR_GR}"
+			fi
+		done
+		cmd+=(-G "${groups}")
+	fi
+
+	shell=$(getparam claves valores "shell")
+	uid=$(getparam claves valores "uid")
+	comment=$(getparam claves valores "comment")
+
+	[ -n "$uid" ] && cmd+=(-u "${uid}")
+	[ -n "$comment" ] && cmd+=(-c "${comment}")
+	[ -n "$shell" ] && cmd+=(-s "${shell}")
+
+	cmd+=(-p '' -m)
+
+	"${cmd[@]}" || {
+		error "Error al crear el usuario."
+		exit "${ERR_CREAR_USR}"
+	}
+
+}
+
+main "$@"

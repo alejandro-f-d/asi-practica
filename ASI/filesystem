@@ -10,8 +10,6 @@
 # 6: error en mandato que crea el sistema de ficheros.
 # 7: error en mandato que elimina el sistema de ficheros.
 
-# TODO: Queda por hacer lo del state.
-
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 GREEN='\033[0;32m'
