@@ -123,9 +123,29 @@ main() {
 		groups=$(getparam claves valores "groups")
 		info "Grupos son: ${groups}"
 		info "Grupos donde esta registrado ya: ${gruposPertenece}"
-		if [ "${groups}" != "" ] && [ "${groups}" != "${gruposPertenece}" ]; then
+		# if [ "${groups}" != "" ] && [ "${groups}" != "${gruposPertenece}" ]; then
+		# 	info "Usermod groups"
+		# 	usermod -G "${groups}" "${usuario}" || {
+		# 		error "Error al modificar el usuario."
+		# 		exit "${ERR_CREAR_USR}"
+		# 	}
+		#
+		# 	exit "${EXIT_CORR}"
+		# fi
+		#
+		#
+		faltan=0
+
+		for g in $groups; do
+			if ! echo "$gruposPertenece" | grep -wq "$g"; then
+				faltan=1
+				break
+			fi
+		done
+
+		if [ "$faltan" -eq 1 ]; then
 			info "Usermod groups"
-			usermod -G "${groups}" "${usuario}" || {
+			usermod -G "$groups" "$usuario" || {
 				error "Error al modificar el usuario."
 				exit "${ERR_CREAR_USR}"
 			}
