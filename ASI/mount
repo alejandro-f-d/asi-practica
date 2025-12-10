@@ -1,0 +1,85 @@
+#!/bin/bash
+
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() {
+	echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+warn() {
+	echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+	echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+getparam() {
+	# El -n es para hacer referencia a los parametros que se reciben son un array.
+	declare -n claves_array="$1"
+	declare -n valores_array="$2"
+	local clave_buscada="$3"
+
+	for idx in "${!claves_array[@]}"; do
+		if [[ "${claves_array[$idx]}" == "$clave_buscada" ]]; then
+			echo "${valores_array[$idx]}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+ERR_SUPERUSR=1
+ERR_ARGS=2
+
+main() {
+	# Comprobación de usuario efectivo es el root. (sudo...)
+	if [ $(id -u) -ne 0 ]; then
+		error "Usuario real no es administrador."
+		exit "${ERR_SUPERUSR}"
+	fi
+
+	# Creación de arrays dinámicos en bash.
+	declare -A claves
+	declare -A valores
+
+	contador=0
+	for par in "$@"; do
+		claves[$contador]="${par%%=*}"
+		valores[$contador]="${par#*=}"
+
+		info "Clave: ${claves[$contador]} | Valor: ${valores[$contador]}"
+
+		contador=$((contador + 1)) # Incrementamos el valor con las funciones matemáticas de bash
+	done
+
+	# Verificacion de lo que se quiere hacer es si es absent para eliminar el sistema de ficheros.
+
+	accion=$(getparam claves valores "state")
+	info "State: $accion"
+	if [ "$accion" = "absent" ]; then
+
+		# Esta parte debiera ser el desmontaje
+		info "Entro en absent."
+		exit 0
+	fi
+
+	info "Ejecución de present"
+	puntoMontaje=$(getparam claves valores "mount_point")
+	source=$(getparam claves valores "source")
+	fs_type=$(getparam claves valores "fs_type")
+	opts=$(getparam claves valores "opts")
+
+	if [ "${puntoMontaje}" = "" ] || [ "${source}" = "" ] || [ "${fs_type}" = "" ] || [ "${opts}" = "" ]; then
+		error "Parámetros obligatorios faltantes."
+		exit "${ERR_ARGS}"
+	fi
+
+}
+
+main $@
